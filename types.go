@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"time"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -177,4 +178,17 @@ type Rate_limits struct {
 	Max_request		uint			`yaml:"max_request"`
 	Reset_time		time.Duration	`yaml:"reset_interval"`
 	Refill			uint			`yaml:"refill"`
+}
+
+//------------------------------------------------------------------------------------------------------2FA
+
+
+type Two_FA_data struct {
+	Id				string
+	Email			string
+	Created_at		time.Time
+	Name			string
+	Password_hash	string
+	Picture			string
+	Purpose			string
 }

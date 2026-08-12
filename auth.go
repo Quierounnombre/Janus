@@ -330,7 +330,7 @@ func Pass_Singup(
 		}
 		user.Email = req.Email
 		user.Name = req.Name
-		id, err := create_a_2FA(db, &user, req.Password)
+		id, err := create_a_2FA(db, &user, req.Password, P_Signup)
 		if err != nil {
 			slog.Error("2FA creating user", "err", err)
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})

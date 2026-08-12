@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"time"
@@ -20,7 +21,8 @@ func create_2FA_table(db *Db_data) {
 		created_at TIMESTAMPTZ DEFAULT NOW(),
 		name TEXT NOT NULL,
 		password_hash TEXT,
-		picture TEXT
+		picture TEXT,
+		purpose TEXT NOT NULL
 	);`
 	ctx, cancel := db.ctx()
 	defer cancel()
@@ -72,12 +74,13 @@ func Move_2FA_to_users(db *Db_data, id string) error {
 	}
 	err = StorePassSimple(db, hash, user.Email, "users")
 	if err != nil {
-		return nil
+		return err
 	}
-	return err
+	return nil
 }
 
-func create_a_2FA(db *Db_data, user *User, password string) (string, error) {
+//This is before all checks, creates a 2FA, trusting that the data is correct.
+func create_a_2FA(db *Db_data, user *User, password string, purpose string) (string, error) {
 	var sql		string
 	var err		error
 
@@ -85,18 +88,21 @@ func create_a_2FA(db *Db_data, user *User, password string) (string, error) {
 		return "", errors.New("email is empty")
 	}
 	sql = `
-	INSERT INTO pending_2fa (id, email, name, picture, created_at) VALUES ($1, $2, $3, $4, $5)
-	ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id, name = EXCLUDED.name, picture = EXCLUDED.picture, created_at = EXCLUDED.created_at
+	INSERT INTO pending_2fa (id, email, name, picture, created_at, purpose) VALUES ($1, $2, $3, $4, $5, $6)
+	ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id, name = EXCLUDED.name, picture = EXCLUDED.picture, created_at = EXCLUDED.created_at, purpose = EXCLUDED.purpose
 	`
 	id := uuid.New().String()
 	ctx, cancel := db.ctx()
 	defer cancel()
-	_, err = db.pool.Exec(ctx, sql, id, user.Email, user.Name, user.Picture, time.Now())
+	_, err = db.pool.Exec(ctx, sql, id, user.Email, user.Name, user.Picture, time.Now(), purpose)
 	if err != nil {
 		return "", err
 	}
-	err = StorePass(db, password, user.Email, "pending_2fa")
-	return id, err
+	if purpose == P_Signup {
+		err = StorePass(db, password, user.Email, D_2FA_DB)
+		return id, err
+	}
+	return id, nil
 }
 
 func delete_a_2FA(db *Db_data, id string) error {
@@ -112,17 +118,41 @@ func delete_a_2FA(db *Db_data, id string) error {
 	return err
 }
 
-func Get2FA(db *Db_data, id string) (string, error) {
+//This obtains a 2FA from DB, and returns the raw data
+func Get2FA(db *Db_data, id string) (Two_FA_data, error) {
 	var err		error
 	var sql		string
-	var email	string
+	var d		Two_FA_data
 
 	sql = `
-	SELECT email FROM pending_2fa WHERE id=$1
+	SELECT id, email, created_at, name, password_hash, picture, purpose FROM pending_2fa WHERE id = $1
 	`
 	ctx, cancel := db.ctx()
 	defer cancel()
 	row := db.pool.QueryRow(ctx, sql, id)
-	err = row.Scan(&email)
-	return email, err
+	err = row.Scan(&d.Id, &d.Email, &d.Created_at, &d.Name, &d.Password_hash, &d.Picture, &d.Purpose)
+	return d, err
+}
+
+func Two_FA_login(db *Db_data
+
+//This manage all the 2FA request and checks the correct use of such.
+func Handle2FAVerified(db *Db_data, id string) error {
+	var err		error
+	var d		Two_FA_data
+
+	d, err = Get2FA(db, id)
+	if err != nil {
+		return err
+	}
+	switch d.Purpose {
+	case P_Signup:
+		return Move_2FA_to_users(db, id)
+	case P_Delete:
+		return Delete_user(db, id)
+	case P_Login:
+		return Two_FA_login(db, id)
+	default:
+		return fmt.Errorf("unknown 2fa purpose: %s", p)
+	}
 }

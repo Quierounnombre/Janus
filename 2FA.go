@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	g_jwt "github.com/appleboy/gin-jwt/v3"
+	"github.com/gin-gonic/gin"
 )
 
 func create_2FA_table(db *Db_data) {
@@ -134,25 +136,42 @@ func Get2FA(db *Db_data, id string) (Two_FA_data, error) {
 	return d, err
 }
 
-func Two_FA_login(db *Db_data
+func Two_FA_login(db *Db_data, id string) error {
+	var err		error
+}
 
 //This manage all the 2FA request and checks the correct use of such.
-func Handle2FAVerified(db *Db_data, id string) error {
-	var err		error
-	var d		Two_FA_data
+func Handle2FAVerified(
+	s					*Settings,
+	db					*Db_data,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
+) gin.HandlerFunc {
+	return func (c *gin.Context) {
+		var err			error
+		var data		Two_FA_data
 
-	d, err = Get2FA(db, id)
-	if err != nil {
-		return err
+		id := c.Param("id")
+		data, err = Get2FA(db, id)
+		if err != nil {
+			slog.Error("Can't retrieve pending 2FA", "err", err)
+			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+			return 
+		}
+		switch data.Purpose {
+		case P_Signup:
+			2FA_signup()
+		case P_Delete:
+			Delete_user(db, data.Id)
+		case P_Login:
+			Two_FA_login(db, data.Id)
+		default:
+			fmt.Errorf("unknown 2fa purpose: %s", p)
+		}
 	}
-	switch d.Purpose {
-	case P_Signup:
-		return Move_2FA_to_users(db, id)
-	case P_Delete:
-		return Delete_user(db, id)
-	case P_Login:
-		return Two_FA_login(db, id)
-	default:
-		return fmt.Errorf("unknown 2fa purpose: %s", p)
-	}
+}
+
+func 2FA_signup(
+	db				*Db_data,
+
+) {
 }

@@ -182,7 +182,6 @@ type Rate_limits struct {
 
 //------------------------------------------------------------------------------------------------------2FA
 
-
 type Two_FA_data struct {
 	Id				string
 	Email			string
@@ -192,3 +191,4 @@ type Two_FA_data struct {
 	Picture			string
 	Purpose			string
 }
+

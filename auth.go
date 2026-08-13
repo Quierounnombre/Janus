@@ -354,10 +354,10 @@ func Validate_2FA(
 ) gin.HandlerFunc {
 	return func (c *gin.Context) {
 		var err			error
-		var db_email	string
+		var data		Two_FA_data
 		
 		id := c.Param("id")
-		db_email, err = Get2FA(db, id)
+		data, err = Get2FA(db, id)
 		if err != nil {
 			slog.Error("Can't retrieve pending 2FA", "err", err)
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
@@ -387,18 +387,6 @@ func Validate_2FA(
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 			return
 		}
-		c.Set(authMiddleware.IdentityKey, user)
-		token, err := authMiddleware.TokenGenerator(c.Request.Context(), user)
-		if err != nil {
-			slog.Error("Couldn't generate a JWT", "err", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		authMiddleware.SetCookie(c, token.AccessToken)
-		authMiddleware.SetRefreshTokenCookie(c, token.RefreshToken)
-		if authMiddleware.LoginResponse != nil {
-			authMiddleware.LoginResponse(c, token)
-		}
 		slog.Info("user registered", "user_id", user.UserID)
 	}
 }
@@ -408,5 +396,24 @@ func ConfirmPage() gin.HandlerFunc {
 		c.HTML(http.StatusOK, "confirm.html", gin.H{
 			"Action": "/2FA_validate/" + c.Param("id"),
 		})
+	}
+}
+
+func Generate_login_token(
+	user				*User,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
+	c					*gin.Context,
+) {
+	c.Set(authMiddleware.IdentityKey, user)
+	token, err := authMiddleware.TokenGenerator(c.Request.Context(), user)
+	if err != nil {
+		slog.Error("Couldn't generate a JWT", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	authMiddleware.SetCookie(c, token.AccessToken)
+	authMiddleware.SetRefreshTokenCookie(c, token.RefreshToken)
+	if authMiddleware.LoginResponse != nil {
+		authMiddleware.LoginResponse(c, token)
 	}
 }

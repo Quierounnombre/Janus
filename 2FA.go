@@ -222,6 +222,12 @@ func Two_FA_login(
 		slog.Error("Error retrieving user", "err", err)
 		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
 	}
+	err = delete_a_2FA(db, data.Id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
 	err = Generate_access_token(user, authMiddleware, c)
 	if err != nil {
 		slog.Error("Couldn't generate a JWT", "err", err)
@@ -236,7 +242,13 @@ func Two_FA_erase(
 	c					*gin.Context,
 	authMiddleware		*g_jwt.GinJWTMiddleware,
 ) {
-	err := EraseUser(db, data)
+	err := delete_a_2FA(db, data.Id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = EraseUser(db, data)
 	if err != nil {
 		slog.Error("Error erasing user", "err", err)
 		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})

@@ -13,7 +13,6 @@ import (
 	"github.com/MicahParks/jwkset"
 	"github.com/MicahParks/keyfunc/v3"
 	g_jwt "github.com/appleboy/gin-jwt/v3"
-	"github.com/appleboy/gin-jwt/v3/core"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

@@ -307,3 +307,32 @@ func ResetPassSend(s *Settings, db *Db_data) gin.HandlerFunc {
 		c.JSON(200, gin.H{"Success": "Password updated"})
 	}
 }
+
+func RequestEraseUser(
+s				*Settings,
+db				*Db_data,
+) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims := g_jwt.ExtractClaims(c)
+		email := claims[D_JWT_identity_key].(string)
+		user, err := GetUser(db, email)
+		if err != nil {
+			slog.Error("user not found for token", "email", email,"err", err)
+			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
+			return
+		}
+		id, err := create_a_2FA(db, user, "", P_Delete)
+		if err != nil {
+			slog.Error("2fa creation failed", "email", email, "err", err)
+			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
+			return
+		}
+		err = TwoFA_Mail(s, db, email, id)
+		if err != nil {
+			slog.Error("2FA sending email", "err", err)
+			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
+			return
+		}
+		c.JSON(200, gin.H{"result": "Check your email"})
+	}
+}

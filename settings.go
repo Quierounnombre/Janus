@@ -85,7 +85,7 @@ func Set_endpoints(
 	{
 		auth.GET("/Profile", GetProfile(db))
 		auth.GET("/Logout", handle.LogoutHandler)
-		auth.DELETE("/Erase_user", EraseUser(db))
+		auth.DELETE("/Erase_user", RequestEraseUser(s, db))
 	}
 	if s.Release_mode == gin.DebugMode {
 		test_endpoints(s, eng)

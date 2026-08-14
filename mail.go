@@ -26,7 +26,7 @@ func init_mail(s *Settings) {
 }
 
 func (mr *Mail_settings)Enqueue(m *gomail.Message) error {
-	//Added protection from heavy load from different IPs
+	//Added protection from heavy load
 	select {
 		case mr.queue <- m:
 			return nil
@@ -35,6 +35,7 @@ func (mr *Mail_settings)Enqueue(m *gomail.Message) error {
 	}
 }
 
+//Could be overloaded, in a VERY especific case, may need extra protection
 func (mr *Mail_settings)Retry_Enqueue(m *gomail.Message) {
 	mr.retry_queue <- m
 }

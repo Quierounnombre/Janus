@@ -17,7 +17,6 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
 	validator "github.com/wagslane/go-password-validator"
 )
 
@@ -186,37 +185,15 @@ func OAuthCallback(s *Settings, db *Db_data, authMiddleware *g_jwt.GinJWTMiddlew
 			c.JSON(500, gin.H{"Error creating user": err.Error()})
 			return
 		}
-		err = handleOAuthSuccess(c, authMiddleware, user, s.OAuth.Provider)
+		c.Set("oauth_provider", s.OAuth.Provider)
+		err = Generate_access_token(user, authMiddleware, c)
 		if err != nil {
-			slog.Error("oauth callback: session issuance failed", "email", storage_data.Email, "error", err)
+			slog.Error("Couldn't generate a JWT", "err", err)
 			c.JSON(500, gin.H{"Error authenticating user": err.Error()})
 			return
 		}
+		slog.Info("oauth callback success", "provider", s.OAuth.Provider, "user_id", user.UserID)
 	}
-}
-
-func handleOAuthSuccess(
-	c				*gin.Context,
-	authMiddleware	*g_jwt.GinJWTMiddleware,
-	user			*User,
-	provider		string,
-) error {
-	var token		*core.Token
-	var err			error
-
-	c.Set(authMiddleware.IdentityKey, user)
-	c.Set("oauth_provider", provider)
-	token, err = authMiddleware.TokenGenerator(c.Request.Context(), user)
-	if err != nil {
-		return err
-	}
-	authMiddleware.SetCookie(c, token.AccessToken)
-	authMiddleware.SetRefreshTokenCookie(c, token.RefreshToken)
-	if authMiddleware.LoginResponse != nil {
-		authMiddleware.LoginResponse(c, token)
-	}
-	slog.Info("oauth callback success", "provider", provider, "user_id", user.UserID)
-	return nil
 }
 
 func Expose_pub_key(s *Settings) gin.HandlerFunc {
@@ -239,7 +216,6 @@ func PassLogin(
 		var req		LoginRequest
 		var err		error
 		var match	bool
-		var token	*core.Token
 		var user	*User
 
 		err = c.ShouldBindJSON(&req)
@@ -275,17 +251,11 @@ func PassLogin(
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.Set(authMiddleware.IdentityKey, user)
-		token, err = authMiddleware.TokenGenerator(c.Request.Context(), user)
+		err = Generate_access_token(user, authMiddleware, c)
 		if err != nil {
 			slog.Error("Couldn't generate a JWT", "err", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
-		}
-		authMiddleware.SetCookie(c, token.AccessToken)
-		authMiddleware.SetRefreshTokenCookie(c, token.RefreshToken)
-		if authMiddleware.LoginResponse != nil {
-			authMiddleware.LoginResponse(c, token)
 		}
 		slog.Info("password login", "user_id", user.UserID)
 	}
@@ -347,50 +317,6 @@ func Pass_Singup(
 	}
 }
 
-func Validate_2FA(
-	s					*Settings,
-	db					*Db_data,
-	authMiddleware		*g_jwt.GinJWTMiddleware,
-) gin.HandlerFunc {
-	return func (c *gin.Context) {
-		var err			error
-		var data		Two_FA_data
-		
-		id := c.Param("id")
-		data, err = Get2FA(db, id)
-		if err != nil {
-			slog.Error("Can't retrieve pending 2FA", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-			return 
-		}
-		_, err = GetUser(db, db_email)
-		if err != pgx.ErrNoRows {
-			slog.Error("User already exists", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-			return
-		}
-		err = Move_2FA_to_users(db, id)
-		if err != nil {
-			slog.Error("Error moving 2FA to users", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-			return
-		}
-		err = delete_a_2FA(db, id)
-		if err != nil {
-			slog.Error("Error deleting 2FA user", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-			return
-		}
-		user, err := GetUser(db, db_email)
-		if err != nil {
-			slog.Error("Error obtaining user", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-			return
-		}
-		slog.Info("user registered", "user_id", user.UserID)
-	}
-}
-
 func ConfirmPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.HTML(http.StatusOK, "confirm.html", gin.H{
@@ -399,21 +325,20 @@ func ConfirmPage() gin.HandlerFunc {
 	}
 }
 
-func Generate_login_token(
+func Generate_access_token(
 	user				*User,
 	authMiddleware		*g_jwt.GinJWTMiddleware,
 	c					*gin.Context,
-) {
+) error {
 	c.Set(authMiddleware.IdentityKey, user)
 	token, err := authMiddleware.TokenGenerator(c.Request.Context(), user)
 	if err != nil {
-		slog.Error("Couldn't generate a JWT", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return err
 	}
 	authMiddleware.SetCookie(c, token.AccessToken)
 	authMiddleware.SetRefreshTokenCookie(c, token.RefreshToken)
 	if authMiddleware.LoginResponse != nil {
 		authMiddleware.LoginResponse(c, token)
 	}
+	return nil
 }

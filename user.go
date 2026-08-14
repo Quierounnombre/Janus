@@ -167,33 +167,22 @@ func Login_or_ADD_User(db *Db_data, storage_data *User) (*User, error) {
 	return user, err
 }
 
-func EraseUser(db *Db_data) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var claims	jwt.MapClaims
-		var sql		string
-		var email	string
-		var err		error
-		var ctx		context.Context
-		var cancel	context.CancelFunc
+func EraseUser(
+	db		*Db_data,
+	data	*Two_FA_data,
+) error {
+	var sql		string
+	var err		error
+	var ctx		context.Context
+	var cancel	context.CancelFunc
 
-		sql = `
-		DELETE FROM users WHERE email=$1
-		`
-		claims = g_jwt.ExtractClaims(c)
-		email = claims["email"].(string)
-		if email == "" {
-			c.JSON(401, gin.H{"Error:": " retrieving claims from jwt"})
-			return
-		}
-		ctx, cancel = db.ctx()
-		defer cancel()
-		_, err = db.pool.Exec(ctx, sql, email)
-		if err != nil {
-			c.JSON(500, gin.H{"Error deleting user:": err.Error()})
-			return
-		}
-		c.JSON(200, gin.H{})
-	}
+	sql = `
+	DELETE FROM users WHERE email=$1
+	`
+	ctx, cancel = db.ctx()
+	defer cancel()
+	_, err = db.pool.Exec(ctx, sql, data.Email)
+	return err
 }
 
 func GetProfile(db *Db_data) gin.HandlerFunc {

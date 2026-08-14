@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	g_jwt "github.com/appleboy/gin-jwt/v3"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 func create_2FA_table(db *Db_data) {
@@ -136,11 +137,9 @@ func Get2FA(db *Db_data, id string) (Two_FA_data, error) {
 	return d, err
 }
 
-func Two_FA_login(db *Db_data, id string) error {
-	var err		error
-}
-
 //This manage all the 2FA request and checks the correct use of such.
+//For a 2FA request to exist, it must have already been checked elsewhere in the endpoint creating it,
+//As an example: 2FA_Signup is generate at PassSignup and consumed here, there is no extra veridity check, other than the correct ID(Hard to guess due to rate limiting)
 func Handle2FAVerified(
 	s					*Settings,
 	db					*Db_data,
@@ -159,19 +158,89 @@ func Handle2FAVerified(
 		}
 		switch data.Purpose {
 		case P_Signup:
-			2FA_signup()
+			Two_FA_signup(db, &data, c, authMiddleware)
 		case P_Delete:
-			Delete_user(db, data.Id)
+			Two_FA_erase(db, &data, c, authMiddleware)
 		case P_Login:
-			Two_FA_login(db, data.Id)
+			Two_FA_login(db, &data, c, authMiddleware)
 		default:
-			fmt.Errorf("unknown 2fa purpose: %s", p)
+			fmt.Errorf("unknown 2fa purpose: %s", data.Purpose)
 		}
 	}
 }
 
-func 2FA_signup(
-	db				*Db_data,
-
+func Two_FA_signup(
+	db					*Db_data,
+	data				*Two_FA_data,
+	c					*gin.Context,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
 ) {
+	var err			error
+
+	id := c.Param("id")
+	_, err = GetUser(db, data.Email)
+	if err != pgx.ErrNoRows {
+		slog.Error("User already exists", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = Move_2FA_to_users(db, id)
+	if err != nil {
+		slog.Error("Error moving 2FA to users", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = delete_a_2FA(db, id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	user, err := GetUser(db, data.Email)
+	if err != nil {
+		slog.Error("Error obtaining user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = Generate_access_token(user, authMiddleware, c)
+	if err != nil {
+		slog.Error("Couldn't generate a JWT", "err", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	slog.Info("user registered", "user_id", user.UserID)
+}
+
+func Two_FA_login(
+	db					*Db_data,
+	data				*Two_FA_data,
+	c					*gin.Context,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
+) {
+	user, err := GetUser(db, data.Email)
+	if err != nil {
+		slog.Error("Error retrieving user", "err", err)
+		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
+	}
+	err = Generate_access_token(user, authMiddleware, c)
+	if err != nil {
+		slog.Error("Couldn't generate a JWT", "err", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+}
+
+func Two_FA_erase(
+	db					*Db_data,
+	data				*Two_FA_data,
+	c					*gin.Context,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
+) {
+	err := EraseUser(db, data)
+	if err != nil {
+		slog.Error("Error erasing user", "err", err)
+		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	c.JSON(200, gin.H{"Success;": " User erased"})
 }

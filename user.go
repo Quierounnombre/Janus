@@ -217,7 +217,8 @@ func ResetPass(s *Settings, db *Db_data) gin.HandlerFunc {
 	return func (c *gin.Context) {
 		var err		error
 		var body	struct {
-			Email	string `json:"email"`
+			Email		string	`json:"email"`
+			NewPass		string	`json:"newpass"`
 		}
 
 		err = c.ShouldBindJSON(&body)
@@ -227,63 +228,13 @@ func ResetPass(s *Settings, db *Db_data) gin.HandlerFunc {
 			return 
 		}
 		if body.Email == "" {
-			slog.Warn("Missing email on a resetpass request", "err", err)
-			c.JSON(400, gin.H{"Error:": " Missing email"})
-			return
-		}
-		_, err = GetUser(db, body.Email)
-		if err != nil {
-			//NOT LEAKING WHICH EMAILS EXIST
-			slog.Warn("Someone tryed to moddify the password for an account that dosent exist", "err", err)
-			c.JSON(200, gin.H{"result": "Check your email"})
-			return
-		}
-		err = Mail_Reset_Pass(s, db, body.Email)
-		if err != nil {
-			slog.Error("Couldn't send the reset_pass_mail", "err", err)
-			c.JSON(500, gin.H{"Error": err.Error()})
-			return
-		}
-		c.JSON(200, gin.H{"result": "Check your email"})
-	}
-}
-
-func ResetPassSend(s *Settings, db *Db_data) gin.HandlerFunc {
-	return func (c *gin.Context) {
-		var err			error
-		var db_email	string
-		var body		struct {
-			NewPass		string `json:"newpass"`
-			Email		string `json:"email"`
-		}
-
-		err = c.ShouldBindJSON(&body)
-		if err != nil {
-			slog.Warn("Missing body on a resetpasssend request", "err", err)
-			c.JSON(400, gin.H{"Error:": " Invalid content"})
-			return 
-		}
-		if body.Email == "" {
-			slog.Warn("Missing email", "err", err)
+			slog.Warn("Missing email on a resetpass request")
 			c.JSON(400, gin.H{"Error:": " Missing email"})
 			return
 		}
 		if body.NewPass == "" {
-			slog.Warn("Missing newpass", "err", err)
-			c.JSON(400, gin.H{"Error:": " Missing password"})
-			return
-		}
-		id := c.Param("id")
-		db_email, err = GetPassReset(db, id)
-		if err != nil {
-			slog.Warn("password reset token not found", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error updating password"})
-			return 
-		}
-		if db_email != body.Email {
-			slog.Warn("password reset email mismatch")
-			c.JSON(400, gin.H{"Error:": " Error updating password"})
-			return 
+			slog.Warn("Missing newpass on a resetpass request")
+			c.JSON(400, gin.H{"Error:" :" Missing newpass"})
 		}
 		err = validator.Validate(body.NewPass, s.Password.Min_entropy)
 		if err != nil {
@@ -291,20 +242,26 @@ func ResetPassSend(s *Settings, db *Db_data) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		err = StorePass(db, body.NewPass, body.Email, "users")
+		user, err := GetUser(db, body.Email)
 		if err != nil {
-			slog.Error("password store failed", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error updating password"})
+			//NOT LEAKING WHICH EMAILS EXIST
+			slog.Warn("Someone tryed to moddify the password for an account that dosent exist", "err", err)
+			c.JSON(200, gin.H{"result": "Check your email"})
 			return
 		}
-		err = delete_a_password_reset(db, id)
+		id, err := create_a_2FA(db, user, body.NewPass, P_Reset)
 		if err != nil {
-			slog.Error("password reset token delete failed", "err", err)
-			c.JSON(500, gin.H{"Error:": " Error updating password"})
+			slog.Error("2fa creation failed", "email", body.Email, "err", err)
+			c.JSON(500, gin.H{"error": "Error creating 2FA"})
 			return
 		}
-		slog.Info("password reset successful for ", "email", body.Email)
-		c.JSON(200, gin.H{"Success": "Password updated"})
+		err = TwoFA_Mail(s, db, body.Email, id)
+		if err != nil {
+			slog.Error("2FA sending email", "err", err)
+			c.JSON(500, gin.H{"error": "Sending 2FA confirmation"})
+			return
+		}
+		c.JSON(200, gin.H{"result": "Check your email"})
 	}
 }
 

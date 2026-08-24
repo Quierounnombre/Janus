@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"log/slog"
 	"time"
@@ -90,18 +89,19 @@ func create_a_2FA(db *Db_data, user *User, password string, purpose string) (str
 	if user.Email == "" {
 		return "", errors.New("email is empty")
 	}
+	ctx, cancel := db.ctx()
 	sql = `
-	INSERT INTO pending_2fa (id, email, name, picture, created_at, purpose) VALUES ($1, $2, $3, $4, $5, $6)
-	ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id, name = EXCLUDED.name, picture = EXCLUDED.picture, created_at = EXCLUDED.created_at, purpose = EXCLUDED.purpose
+		WITH del AS (DELETE FROM pending_2fa WHERE email = $2)
+		INSERT INTO pending_2fa (id, email, name, picture, created_at, purpose)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 	id := uuid.New().String()
-	ctx, cancel := db.ctx()
 	defer cancel()
 	_, err = db.pool.Exec(ctx, sql, id, user.Email, user.Name, user.Picture, time.Now(), purpose)
 	if err != nil {
 		return "", err
 	}
-	if purpose == P_Signup {
+	if purpose == P_Signup || purpose == P_Reset {
 		err = StorePass(db, password, user.Email, D_2FA_DB)
 		return id, err
 	}
@@ -163,8 +163,10 @@ func Handle2FAVerified(
 			Two_FA_erase(db, &data, c, authMiddleware)
 		case P_Login:
 			Two_FA_login(db, &data, c, authMiddleware)
+		case P_Reset:
+			Two_FA_reset(db, &data, c, authMiddleware)
 		default:
-			fmt.Errorf("unknown 2fa purpose: %s", data.Purpose)
+			c.JSON(500, gin.H{"Error:": "unknown 2fa purpose: " + data.Purpose})
 		}
 	}
 }
@@ -178,6 +180,12 @@ func Two_FA_signup(
 	var err			error
 
 	id := c.Param("id")
+	err = delete_a_2FA(db, id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
 	_, err = GetUser(db, data.Email)
 	if err != pgx.ErrNoRows {
 		slog.Error("User already exists", "err", err)
@@ -187,12 +195,6 @@ func Two_FA_signup(
 	err = Move_2FA_to_users(db, id)
 	if err != nil {
 		slog.Error("Error moving 2FA to users", "err", err)
-		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-		return
-	}
-	err = delete_a_2FA(db, id)
-	if err != nil {
-		slog.Error("Error deleting 2FA user", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
@@ -217,16 +219,16 @@ func Two_FA_login(
 	c					*gin.Context,
 	authMiddleware		*g_jwt.GinJWTMiddleware,
 ) {
-	user, err := GetUser(db, data.Email)
-	if err != nil {
-		slog.Error("Error retrieving user", "err", err)
-		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
-	}
-	err = delete_a_2FA(db, data.Id)
+	err := delete_a_2FA(db, data.Id)
 	if err != nil {
 		slog.Error("Error deleting 2FA user", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
+	}
+	user, err := GetUser(db, data.Email)
+	if err != nil {
+		slog.Error("Error retrieving user", "err", err)
+		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
 	}
 	err = Generate_access_token(user, authMiddleware, c)
 	if err != nil {
@@ -255,4 +257,25 @@ func Two_FA_erase(
 		return
 	}
 	c.JSON(200, gin.H{"Success;": " User erased"})
+}
+
+func Two_FA_reset(
+	db					*Db_data,
+	data				*Two_FA_data,
+	c					*gin.Context,
+	authMiddleware		*g_jwt.GinJWTMiddleware,
+) {
+	err := delete_a_2FA(db, data.Id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = StorePassSimple(db, data.Password_hash, data.Email, D_USERS_DB)
+	if err != nil {
+		slog.Error("password store failed", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error updating password"})
+		return
+	}
+	c.JSON(200, gin.H{"Success;": "Password changed"})
 }

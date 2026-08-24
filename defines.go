@@ -10,6 +10,7 @@ const (
 	P_Login				= "login"
 	P_Delete			= "delete"
 	P_Signup			= "signup"
+	P_Reset				= "reset"
 
 	D_config_path		= "config.yaml"
 	D_JWT_identity_key	= "email"
@@ -20,4 +21,5 @@ const (
 	D_2FA_time			= 5 * time.Minute
 
 	D_2FA_DB			= "pending_2fa"
+	D_USERS_DB			= "users"
 )

@@ -53,7 +53,7 @@ func SendTestEmail_simple(s *Settings) gin.HandlerFunc {
 		d := gomail.NewDialer(s.Mail.Provider, 587, s.Mail.User, s.Mail_key)
 		err = d.DialAndSend(m)
 		if err != nil {
-			slog.Error("failed to send email to %s: %v", m.GetHeader("To"), err)
+			slog.Error("failed to send email", "to", m.GetHeader("To"), "err", err)
 		}
 	}
 }

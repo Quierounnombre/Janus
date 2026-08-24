@@ -112,29 +112,7 @@ func (mr *Mail_settings)Manager() {
 	}
 }
 
-func Mail_Reset_Pass(s *Settings, db *Db_data, target string) error {
-	var err		error
-
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.Mail.From)
-	m.SetHeader("To", target)
-	m.SetHeader("Subject", "Cambiar contraseña")
-	id, err := create_a_password_reset(db, target)
-	if err != nil {
-		return err
-	}
-	str, err := resetPasswordHTML(s.Frontend + "/Reset_pass_new/" + id)
-	if err != nil {
-		return err
-	}
-	m.SetBody("text/html", str)
-	err = s.Mail.Enqueue(m)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+//TODO: Personalized HTML for each purpose from 2FA
 func resetPasswordHTML(link string) (string, error) {
 	var buf		bytes.Buffer
 	var err		error

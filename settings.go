@@ -77,7 +77,6 @@ func Set_endpoints(
 	eng.POST("/2FA_validate/:id", Handle2FAVerified(s, db, handle))
 	eng.GET("/2FA_validate/:id", ConfirmPage())
 	eng.POST("/PassReset", ResetPass(s, db))
-	eng.POST("/Reset_pass_new/:id", ResetPassSend(s, db))
 	eng.POST("/Refresh", handle.RefreshHandler)
 	eng.GET("/Public-key", Expose_pub_key(s))
 	eng.NoRoute(handle.MiddlewareFunc(), handleNoRoute())
@@ -95,11 +94,11 @@ func Set_endpoints(
 func Set_JWT(s *Settings) *g_jwt.GinJWTMiddleware {
 	Middleware, err := g_jwt.New(init_jwt_params(s))
 	if err != nil {
-		log.Fatalf("JWT Error:" + err.Error())
+		log.Fatalf("JWT Error: %v", err.Error())
 	}
 	err = Middleware.MiddlewareInit()
 	if err != nil {
-		log.Fatalf("Middleware init Error:" + err.Error())
+		log.Fatalf("Middleware init Error: %v", err.Error())
 	}
 	return Middleware
 }
@@ -118,7 +117,7 @@ func Set_RateLimiter(s *Settings) *RateLimiter {
 func initJWKS_client(s *Settings) {
 	k, err := keyfunc.NewDefaultCtx(context.Background(), []string{s.OAuth.JKWS})
 	if err != nil {
-		log.Fatalf("JWKS init Error:" + err.Error())
+		log.Fatalf("JWKS init Error: %v", err.Error())
 	}
 	JWKS = k
 }
@@ -126,7 +125,7 @@ func initJWKS_client(s *Settings) {
 func initJWKS_server(s *Settings) {
 	rsaPub, err := jwt.ParseRSAPublicKeyFromPEM([]byte(s.Jwt_pub_key))
 	if err != nil {
-		log.Fatalf("Error reading public key: " + err.Error())
+		log.Fatalf("Error reading public key: %v", err.Error())
 	}
 	options := jwkset.JWKOptions {
 		Marshal: jwkset.JWKMarshalOptions{Private: false},
@@ -138,12 +137,12 @@ func initJWKS_server(s *Settings) {
 	}
 	jwk, err := jwkset.NewJWKFromKey(rsaPub, options)
 	if err != nil {
-		log.Fatalf("Error creating jwkstorage: " + err.Error())
+		log.Fatalf("Error creating jwkstorage: %v", err.Error())
 	}
 	jwkStorage = jwkset.NewMemoryStorage()
 	err = jwkStorage.KeyWrite(context.Background(), jwk)
 	if err != nil {
-		log.Fatalf("Error writing into storage: " + err.Error())
+		log.Fatalf("Error writing into storage: %v", err.Error())
 	}
 }
 

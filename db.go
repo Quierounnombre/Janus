@@ -43,7 +43,6 @@ func (db *Db_data)ctx() (context.Context, context.CancelFunc) {
 
 func Set_db_tables(db *Db_data) {
 	create_table_user(db)
-	create_password_reset_table(db)
 	create_2FA_table(db)
 }
 

@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	g_jwt "github.com/appleboy/gin-jwt/v3"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func create_2FA_table(db *Db_data) {
@@ -89,21 +90,31 @@ func create_a_2FA(db *Db_data, user *User, password string, purpose string) (str
 	if user.Email == "" {
 		return "", errors.New("email is empty")
 	}
-	ctx, cancel := db.ctx()
+	var hash []byte
+	//TODO: When doing P_Login one may need to expand this
+	if purpose == P_Signup || purpose == P_Reset {
+		hash, err = bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return "", err
+		}
+	}
 	sql = `
-		WITH del AS (DELETE FROM pending_2fa WHERE email = $2)
-		INSERT INTO pending_2fa (id, email, name, picture, created_at, purpose)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO pending_2fa (id, email, name, picture, created_at, purpose, password_hash)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (email) DO UPDATE SET
+			id = EXCLUDED.id,
+			name = EXCLUDED.name,
+			picture = EXCLUDED.picture,
+			created_at = EXCLUDED.created_at,
+			purpose = EXCLUDED.purpose,
+			password_hash = COALESCE(NULLIF(EXCLUDED.password_hash, ''), pending_2fa.password_hash)
 	`
 	id := uuid.New().String()
+	ctx, cancel := db.ctx()
 	defer cancel()
-	_, err = db.pool.Exec(ctx, sql, id, user.Email, user.Name, user.Picture, time.Now(), purpose)
+	_, err = db.pool.Exec(ctx, sql, id, user.Email, user.Name, user.Picture, time.Now(), purpose, string(hash))
 	if err != nil {
 		return "", err
-	}
-	if purpose == P_Signup || purpose == P_Reset {
-		err = StorePass(db, password, user.Email, D_2FA_DB)
-		return id, err
 	}
 	return id, nil
 }
@@ -180,12 +191,6 @@ func Two_FA_signup(
 	var err			error
 
 	id := c.Param("id")
-	err = delete_a_2FA(db, id)
-	if err != nil {
-		slog.Error("Error deleting 2FA user", "err", err)
-		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
-		return
-	}
 	_, err = GetUser(db, data.Email)
 	if err != pgx.ErrNoRows {
 		slog.Error("User already exists", "err", err)
@@ -195,6 +200,12 @@ func Two_FA_signup(
 	err = Move_2FA_to_users(db, id)
 	if err != nil {
 		slog.Error("Error moving 2FA to users", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	err = delete_a_2FA(db, id)
+	if err != nil {
+		slog.Error("Error deleting 2FA user", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}

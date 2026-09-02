@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 	g_jwt "github.com/appleboy/gin-jwt/v3"

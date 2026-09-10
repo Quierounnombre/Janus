@@ -25,7 +25,7 @@ func init_jwt_params(s *Settings) *g_jwt.GinJWTMiddleware {
 		Authorizer:			authorizer(),
 		Unauthorized:		unauthorized(),
 		LogoutResponse:		logout_response(),
-		LoginResponse:		login_response(s),
+		LoginResponse:		login_response(),
 		TokenLookup:		s.Jwt.TokenLookup,
 		TokenHeadName:		s.Jwt.TokenHeadName,
 		TimeFunc:			time.Now,
@@ -47,8 +47,7 @@ func payload_func() func(data any) jwt.MapClaims {
 			return jwt.MapClaims{}
 		}
 		return jwt.MapClaims{
-			D_JWT_identity_key: value.Email,
-			D_User_ID: value.UserID.String(),
+			D_JWT_identity_key: value.UserID.String(),
 		}
 	}
 }
@@ -56,15 +55,21 @@ func payload_func() func(data any) jwt.MapClaims {
 func identity_handler() func(c *gin.Context) any {
 	return func(c *gin.Context) any {
 		claims := g_jwt.ExtractClaims(c)
-		id, _ := uuid.Parse(claims[D_User_ID].(string))
+		id_str, ok := claims[D_JWT_identity_key].(string)
+		if !ok {
+			return nil
+		}
+		id, err := uuid.Parse(id_str)
+		if err != nil {
+			return nil
+		}
 		return &User{
-			Email: claims[D_JWT_identity_key].(string),
 			UserID: id,
 		}
 	}
 }
 
-func login_response(s *Settings) func(c *gin.Context, token *core.Token) {
+func login_response() func(c *gin.Context, token *core.Token) {
 	return func(c *gin.Context, token *core.Token) {
 		c.JSON(http.StatusOK, gin.H{
 			"code":          http.StatusOK,
@@ -107,7 +112,7 @@ func logout_response() func(c *gin.Context) {
 func handleNoRoute() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
-			"code":    "PAGE_NOT_FOUND",
+			"code":    http.StatusNotFound,
 			"message": "Page not found",
 		})
 	}

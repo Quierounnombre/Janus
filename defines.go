@@ -13,8 +13,7 @@ const (
 	P_Reset				= "reset"
 
 	D_config_path		= "config.yaml"
-	D_JWT_identity_key	= "email"
-	D_User_ID			= "user_id"
+	D_JWT_identity_key	= "user_id"
 
 	D_Reset_pass_time	= 5 * time.Minute
 	D_Reset_check_time	= 5 * time.Minute

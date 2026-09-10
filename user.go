@@ -57,7 +57,26 @@ func AddUser(db *Db_data, user *User) error {
 	return err
 }
 
-func GetUser(db *Db_data, email string) (*User, error) {
+func GetUser(db *Db_data, id string) (*User, error) {
+	var err		error
+	var sql		string
+	var ctx		context.Context
+	var cancel	context.CancelFunc
+	var row		pgx.Row
+	var user	*User
+
+	user = new(User)
+	sql = `
+	SELECT name, email, id, picture FROM users WHERE id=$1
+	`
+	ctx, cancel = db.ctx()
+	defer cancel()
+	row = db.pool.QueryRow(ctx, sql, id)
+	err = row.Scan(&user.Name, &user.Email, &user.UserID, &user.Picture)
+	return user, err
+}
+
+func GetUserByMail(db *Db_data, email string) (*User, error) {
 	var err		error
 	var sql		string
 	var ctx		context.Context
@@ -163,7 +182,7 @@ func Login_or_ADD_User(db *Db_data, storage_data *User) (*User, error) {
 	} else if err != nil {
 		return user, err
 	}
-	user, err = GetUser(db, storage_data.Email)
+	user, err = GetUserByMail(db, storage_data.Email)
 	return user, err
 }
 
@@ -189,17 +208,16 @@ func GetProfile(db *Db_data) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var claims		jwt.MapClaims
 		var err			error
-		var email		string
 		var user		*User
 
 		claims = g_jwt.ExtractClaims(c)
-		email = claims["email"].(string)
-		if email == "" {
-			slog.Error("JWT missing email field", "err", err)
+		id, ok := claims[D_JWT_identity_key].(string)
+		if !ok {
+			slog.Error("JWT missing identity_key field", "err", err)
 			c.JSON(401, gin.H{"Error:": " retrieving claims from jwt"})
 			return
 		}
-		user, err = GetUser(db, email)
+		user, err = GetUser(db, id)
 		if err != nil {
 			slog.Error("User dosen't exist", "err", err)
 			c.JSON(500, gin.H{"Error:": " obtaining user from db"})
@@ -242,20 +260,20 @@ func ResetPass(s *Settings, db *Db_data) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
-		user, err := GetUser(db, body.Email)
+		user, err := GetUserByMail(db, body.Email)
 		if err != nil {
 			//NOT LEAKING WHICH EMAILS EXIST
 			slog.Warn("Someone tryed to moddify the password for an account that dosent exist", "err", err)
 			c.JSON(200, gin.H{"result": "Check your email"})
 			return
 		}
-		id, err := create_a_2FA(db, user, body.NewPass, P_Reset)
+		id_2fa, err := create_a_2FA(db, user, body.NewPass, P_Reset)
 		if err != nil {
 			slog.Error("2fa creation failed", "email", body.Email, "err", err)
 			c.JSON(500, gin.H{"error": "Error creating 2FA"})
 			return
 		}
-		err = TwoFA_Mail(s, db, body.Email, id)
+		err = TwoFA_Mail(s, db, body.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"error": "Sending 2FA confirmation"})
@@ -271,20 +289,20 @@ db				*Db_data,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := g_jwt.ExtractClaims(c)
-		email := claims[D_JWT_identity_key].(string)
-		user, err := GetUser(db, email)
+		id := claims[D_JWT_identity_key].(string)
+		user, err := GetUser(db, id)
 		if err != nil {
-			slog.Error("user not found for token", "email", email,"err", err)
+			slog.Error("user not found for token", "id", id,"err", err)
 			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
 			return
 		}
-		id, err := create_a_2FA(db, user, "", P_Delete)
+		id_2fa, err := create_a_2FA(db, user, "", P_Delete)
 		if err != nil {
-			slog.Error("2fa creation failed", "email", email, "err", err)
+			slog.Error("2fa creation failed", "id", id, "err", err)
 			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
 			return
 		}
-		err = TwoFA_Mail(s, db, email, id)
+		err = TwoFA_Mail(s, db, user.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"error": "Requesting Erasing User"})

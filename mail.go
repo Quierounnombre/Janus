@@ -124,14 +124,14 @@ func resetPasswordHTML(link string) (string, error) {
 	return buf.String(), nil
 }
 
-func TwoFA_Mail(s *Settings, db *Db_data, target string, id string) error {
+func TwoFA_Mail(s *Settings, db *Db_data, target string, id_2fa string) error {
 	var err		error
 
 	m := gomail.NewMessage()
 	m.SetHeader("From", s.Mail.From)
 	m.SetHeader("To", target)
 	m.SetHeader("Subject", "Doble factor de autentificación")
-	str, err := TwoFAHTML(s.Frontend + "/2FA_validate/" + id)
+	str, err := TwoFAHTML(s.Frontend + "/2FA_validate/" + id_2fa)
 	if err != nil {
 		return err
 	}

@@ -191,7 +191,7 @@ func Two_FA_signup(
 	var err			error
 
 	id := c.Param("id")
-	_, err = GetUser(db, data.Email)
+	_, err = GetUserByMail(db, data.Email)
 	if err != pgx.ErrNoRows {
 		slog.Error("User already exists", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
@@ -209,7 +209,7 @@ func Two_FA_signup(
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	user, err := GetUser(db, data.Email)
+	user, err := GetUserByMail(db, data.Email)
 	if err != nil {
 		slog.Error("Error obtaining user", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
@@ -236,7 +236,7 @@ func Two_FA_login(
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	user, err := GetUser(db, data.Email)
+	user, err := GetUserByMail(db, data.Email)
 	if err != nil {
 		slog.Error("Error retrieving user", "err", err)
 		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})

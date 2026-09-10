@@ -244,7 +244,7 @@ func PassLogin(
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Password don't match"})
 			return
 		}
-		user, err = GetUser(db, req.Email)
+		user, err = GetUserByMail(db, req.Email)
 		if err != nil {
 			slog.Error("Couldn't retrieve user from DB", "err", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -299,13 +299,13 @@ func Pass_Singup(
 		}
 		user.Email = req.Email
 		user.Name = req.Name
-		id, err := create_a_2FA(db, &user, req.Password, P_Signup)
+		id_2fa, err := create_a_2FA(db, &user, req.Password, P_Signup)
 		if err != nil {
 			slog.Error("2FA creating user", "err", err)
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 			return
 		}
-		err = TwoFA_Mail(s, db, req.Email, id)
+		err = TwoFA_Mail(s, db, req.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})

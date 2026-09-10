@@ -19,6 +19,21 @@ services:
       timeout: 3s
       interval: 2s
 
+  auth_redis:
+    restart: always
+    image: redis:8.10.1-alpine
+    expose:
+      - ${REDIS_PORT}
+    networks:
+      - auth
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      retries: 20
+      timeout: 3s
+      interval: 2s
+
   auth_service:
     restart: always
     build:
@@ -32,6 +47,8 @@ services:
     depends_on:
       auth_db:
         condition: service_healthy
+      auth_redis:
+        condition: service_healthy
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -44,12 +61,15 @@ services:
       JWT_PUB_KEY: ${JWT_PUB_KEY}
       CLIENT_ID: ${CLIENT_ID}
       CLIENT_SECRET: ${CLIENT_SECRET}
+      REDIS_ADDR: auth_redis:${REDIS_PORT}
     networks:
         - auth
 
 volumes:
   postgres_data:
     name: postgres_data
+  redis_data:
+    name: redis_data
 
 networks:
   auth:

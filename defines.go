@@ -14,6 +14,7 @@ const (
 
 	D_config_path		= "config.yaml"
 	D_JWT_identity_key	= "user_id"
+	D_JWT_exp			= "exp"
 
 	D_Reset_pass_time	= 5 * time.Minute
 	D_Reset_check_time	= 5 * time.Minute

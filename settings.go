@@ -68,6 +68,7 @@ func Set_endpoints(
 	s			*Settings,
 	eng			*gin.Engine,
 	db			*Db_data,
+	rds			*Redis_data,
 	handle		*g_jwt.GinJWTMiddleware,
 ) {
 	eng.GET("/OAuthLogin", OAuthLogin(s))
@@ -86,13 +87,10 @@ func Set_endpoints(
 		auth.GET("/Logout", handle.LogoutHandler)
 		auth.DELETE("/Erase_user", RequestEraseUser(s, db))
 	}
-	if s.Release_mode == gin.DebugMode {
-		test_endpoints(s, eng)
-	}
 }
 
-func Set_JWT(s *Settings) *g_jwt.GinJWTMiddleware {
-	Middleware, err := g_jwt.New(init_jwt_params(s))
+func Set_JWT(s *Settings, rds *Redis_data) *g_jwt.GinJWTMiddleware {
+	Middleware, err := g_jwt.New(init_jwt_params(s, rds))
 	if err != nil {
 		log.Fatalf("JWT Error: %v", err.Error())
 	}
@@ -151,9 +149,9 @@ func load_templates() {
 	slog.Info("Loaded templates", "size: ", len(tmpls.Templates()))
 }
 
-func Set_gin(s *Settings, db *Db_data) *gin.Engine {
+func Set_gin(s *Settings, db *Db_data, rds *Redis_data) *gin.Engine {
 	load_templates()
-	Middleware := Set_JWT(s)
+	Middleware := Set_JWT(s, rds)
 	init_mail(s)
 	initJWKS_client(s)
 	initJWKS_server(s)
@@ -169,6 +167,6 @@ func Set_gin(s *Settings, db *Db_data) *gin.Engine {
 		eng.Use(rl.Middleware())
 	}
 	eng.Use(sessions.Sessions("state_session", store))
-	Set_endpoints(s, eng, db, Middleware)
+	Set_endpoints(s, eng, db, rds, Middleware)
 	return eng
 }

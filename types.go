@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"gopkg.in/gomail.v2"
 )
 
@@ -26,6 +27,12 @@ type Db_settings struct {
 	Max_con_life_time_jitter	time.Duration		`yaml:"max_con_lifetime_jitter"`
 	Max_con_idle_time			time.Duration		`yaml:"max_con_idle_time"`
 	Ctx_timeout					time.Duration		`yaml:"ctx_timeout"`
+}
+
+type Redis_settings struct {
+	Ctx_timeout					time.Duration		`yaml:"ctx_timeout"`
+	Margin_time					time.Duration		`yaml:"margin_time"`
+	Addr						string				`yaml:"addr"`
 }
 
 /*
@@ -121,6 +128,7 @@ type Settings struct {
 	Mail				Mail_settings		`yaml:"mail"`
 	Logger				Logger_settings		`yaml:"logger"`
 	Password			Password_settings	`yaml:"password"`
+	Redis				Redis_settings		`yaml:"redis"`
 
 	// injected from .env
 
@@ -138,6 +146,13 @@ type Settings struct {
 type Db_data struct {
 	pool			*pgxpool.Pool
 	cancel			context.CancelFunc
+	ctx_timeout		time.Duration
+}
+
+type Redis_data struct {
+	rdb				*redis.Client
+	Addr			string
+	Margin_time		time.Duration
 	ctx_timeout		time.Duration
 }
 

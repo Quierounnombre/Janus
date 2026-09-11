@@ -213,7 +213,7 @@ func GetProfile(db *Db_data) gin.HandlerFunc {
 		claims = g_jwt.ExtractClaims(c)
 		id, ok := claims[D_JWT_identity_key].(string)
 		if !ok {
-			slog.Error("JWT missing identity_key field", "err", err)
+			slog.Error("JWT missing identity_key field")
 			c.JSON(401, gin.H{"Error:": " retrieving claims from jwt"})
 			return
 		}

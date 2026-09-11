@@ -1,8 +1,10 @@
 package main
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
+
 	g_jwt "github.com/appleboy/gin-jwt/v3"
 	"github.com/appleboy/gin-jwt/v3/core"
 	"github.com/gin-gonic/gin"
@@ -10,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func init_jwt_params(s *Settings) *g_jwt.GinJWTMiddleware {
+func init_jwt_params(s *Settings, rds *Redis_data) *g_jwt.GinJWTMiddleware {
 	return &g_jwt.GinJWTMiddleware{
 		Realm:				s.Jwt.Realm,
 		PrivKeyBytes:		[]byte(s.Jwt_priv_key),
@@ -20,11 +22,11 @@ func init_jwt_params(s *Settings) *g_jwt.GinJWTMiddleware {
 		MaxRefresh:			s.Jwt.MaxRefresh,
 		IdentityKey:		D_JWT_identity_key,
 		PayloadFunc:		payload_func(),
-		IdentityHandler:	identity_handler(),
+		IdentityHandler:	identity_handler(rds),
 		Authenticator:		authenticator(),
 		Authorizer:			authorizer(),
 		Unauthorized:		unauthorized(),
-		LogoutResponse:		logout_response(),
+		LogoutResponse:		logout_response(rds),
 		LoginResponse:		login_response(),
 		TokenLookup:		s.Jwt.TokenLookup,
 		TokenHeadName:		s.Jwt.TokenHeadName,
@@ -52,7 +54,7 @@ func payload_func() func(data any) jwt.MapClaims {
 	}
 }
 
-func identity_handler() func(c *gin.Context) any {
+func identity_handler(rds *Redis_data) func(c *gin.Context) any {
 	return func(c *gin.Context) any {
 		claims := g_jwt.ExtractClaims(c)
 		id_str, ok := claims[D_JWT_identity_key].(string)
@@ -61,6 +63,15 @@ func identity_handler() func(c *gin.Context) any {
 		}
 		id, err := uuid.Parse(id_str)
 		if err != nil {
+			return nil
+		}
+		token := g_jwt.GetToken(c)
+		revoked, err := rds.Is_revoked(token)
+		if err != nil {
+			slog.Error("Redis check failed", "err", err)
+			return nil
+		}
+		if revoked {
 			return nil
 		}
 		return &User{
@@ -103,9 +114,28 @@ func unauthorized() func(c *gin.Context, code int, message string) {
 	}
 }
 
-func logout_response() func(c *gin.Context) {
+func logout_response(rds *Redis_data) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{})
+		claims := g_jwt.ExtractClaims(c)
+		raw_exp, ok := claims[D_JWT_exp].(float64)
+		if !ok {
+			slog.Error("JWT missing exp field")
+			c.JSON(400, gin.H{"Error:": " retrieving claims from jwt"})
+			return
+		}
+		token := g_jwt.GetToken(c)
+		expires_at := time.Unix(int64(raw_exp), 0)
+		remaining := time.Until(expires_at)
+		if remaining > 0 {
+			remaining += rds.Margin_time
+			err := rds.Add_token(token, remaining)
+			if err != nil {
+				slog.Error("Error Adding token to redis db")
+				c.JSON(500, gin.H{"error": "logout failed, please try again"})
+				return
+			}
+		}
+		c.JSON(200, gin.H{"message": "logged out"})
 	}
 }
 

@@ -18,6 +18,7 @@ func Set_Redis(s *Settings, rds *Redis_data) {
 		},
 	)
 	rds.Addr = s.Redis.Addr
+	rds.ctx_timeout = s.Redis.Ctx_timeout
 }
 
 func (rds *Redis_data)Add_token(token string, remaining time.Duration) error {

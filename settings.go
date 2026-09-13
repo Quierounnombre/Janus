@@ -19,6 +19,31 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func Set_endpoints(
+	s			*Settings,
+	eng			*gin.Engine,
+	db			*Db_data,
+	rds			*Redis_data,
+	handle		*g_jwt.GinJWTMiddleware,
+) {
+	eng.GET("/OAuthLogin", OAuthLogin(s))
+	eng.GET("/OAuthCallback", OAuthCallback(s, db, handle))
+	eng.POST("/PassLogin", PassLogin(db, handle))
+	eng.POST("/PassSignup", Pass_Singup(s, db, handle))
+	eng.POST("/2FA_validate/:id", Handle2FAVerified(s, db, handle))
+	eng.GET("/2FA_validate/:id", ConfirmPage())
+	eng.POST("/PassReset", ResetPass(s, db))
+	eng.POST("/Refresh", handle.RefreshHandler)
+	eng.GET("/Public-key", Expose_pub_key(s))
+	eng.NoRoute(handle.MiddlewareFunc(), handleNoRoute())
+	auth := eng.Group("/User/", handle.MiddlewareFunc())
+	{
+		auth.GET("/Profile", GetProfile(db))
+		auth.GET("/Logout", handle.LogoutHandler)
+		auth.DELETE("/Erase_user", RequestEraseUser(s, db))
+	}
+}
+
 func load_settings_from_env(s *Settings) {
 	content, err := os.ReadFile(D_config_path)
 	if err != nil {
@@ -62,31 +87,6 @@ func Set_cors_config(s *Settings) cors.Config {
 	config.MaxAge						= s.Cors.MaxAge
 	config.OptionsResponseStatusCode	= s.Cors.OptionsResponseStatus
 	return config
-}
-
-func Set_endpoints(
-	s			*Settings,
-	eng			*gin.Engine,
-	db			*Db_data,
-	rds			*Redis_data,
-	handle		*g_jwt.GinJWTMiddleware,
-) {
-	eng.GET("/OAuthLogin", OAuthLogin(s))
-	eng.GET("/OAuthCallback", OAuthCallback(s, db, handle))
-	eng.POST("/PassLogin", PassLogin(db, handle))
-	eng.POST("/PassSignup", Pass_Singup(s, db, handle))
-	eng.POST("/2FA_validate/:id", Handle2FAVerified(s, db, handle))
-	eng.GET("/2FA_validate/:id", ConfirmPage())
-	eng.POST("/PassReset", ResetPass(s, db))
-	eng.POST("/Refresh", handle.RefreshHandler)
-	eng.GET("/Public-key", Expose_pub_key(s))
-	eng.NoRoute(handle.MiddlewareFunc(), handleNoRoute())
-	auth := eng.Group("/User/", handle.MiddlewareFunc())
-	{
-		auth.GET("/Profile", GetProfile(db))
-		auth.GET("/Logout", handle.LogoutHandler)
-		auth.DELETE("/Erase_user", RequestEraseUser(s, db))
-	}
 }
 
 func Set_JWT(s *Settings, rds *Redis_data) *g_jwt.GinJWTMiddleware {

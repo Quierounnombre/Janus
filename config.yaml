@@ -20,6 +20,11 @@ db:
   max_con_idle_time: "3m"
   ctx_timeout: "15s" #Max time waiting for a call to the db
 
+redis:
+  ctx_timeout: "15s"
+  margin_time: "1m"
+  addr: "auth_redis:6379"
+
 #Standar CORS settings, prety self explicatory
 cors:
   allow_all_origins: false

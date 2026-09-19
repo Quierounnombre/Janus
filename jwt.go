@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	g_jwt "github.com/appleboy/gin-jwt/v3"
@@ -65,7 +66,9 @@ func identity_handler(rds *Redis_data) func(c *gin.Context) any {
 		if err != nil {
 			return nil
 		}
-		token := g_jwt.GetToken(c)
+		//FIX WHEN LIBRARY
+		//token := g_jwt.GetToken(c)
+		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		revoked, err := rds.Is_revoked(token)
 		if err != nil {
 			slog.Error("Redis check failed", "err", err)
@@ -123,7 +126,9 @@ func logout_response(rds *Redis_data) func(c *gin.Context) {
 			c.JSON(400, gin.H{"Error:": " retrieving claims from jwt"})
 			return
 		}
-		token := g_jwt.GetToken(c)
+		//token := g_jwt.GetToken(c)
+		//ERASE WHEN FIXED
+		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
 		slog.Info("TOKEN AQUI", "token", token)
 		expires_at := time.Unix(int64(raw_exp), 0)
 		remaining := time.Until(expires_at)

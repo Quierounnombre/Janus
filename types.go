@@ -116,6 +116,10 @@ type Password_settings struct {
 	Min_entropy			float64				`yaml:"min_entropy"`
 }
 
+type Delete_settings struct {
+	Delete_time			time.Duration		`yaml:"delete_time"`
+}
+
 type Settings struct {
 	Release_mode		string				`yaml:"release_mode"`
 	Frontend			string				`yaml:"frontend"`
@@ -129,6 +133,7 @@ type Settings struct {
 	Logger				Logger_settings		`yaml:"logger"`
 	Password			Password_settings	`yaml:"password"`
 	Redis				Redis_settings		`yaml:"redis"`
+	Delete				Delete_settings		`yaml:"delete"`
 
 	// injected from .env
 
@@ -161,6 +166,7 @@ type User struct {
 	Email			string		`json:"email"`
 	UserID			uuid.UUID	`json:"id"`
 	Picture			string		`json:"picture"`
+	Joined			time.Time	`json:"joined"`
 }
 
 type LoginRequest struct {

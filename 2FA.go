@@ -171,7 +171,7 @@ func Handle2FAVerified(
 		case P_Signup:
 			Two_FA_signup(db, &data, c, authMiddleware)
 		case P_Delete:
-			Two_FA_erase(db, &data, c, authMiddleware)
+			Two_FA_erase(db, &data, c, authMiddleware, s)
 		case P_Login:
 			Two_FA_login(db, &data, c, authMiddleware)
 		case P_Reset:
@@ -254,6 +254,7 @@ func Two_FA_erase(
 	data				*Two_FA_data,
 	c					*gin.Context,
 	authMiddleware		*g_jwt.GinJWTMiddleware,
+	s					*Settings,
 ) {
 	err := delete_a_2FA(db, data.Id)
 	if err != nil {
@@ -261,13 +262,19 @@ func Two_FA_erase(
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	err = EraseUser(db, data)
+	err = move_to_soft_delete(db, data.Id)
 	if err != nil {
-		slog.Error("Error erasing user", "err", err)
+		slog.Error("Error moving to soft_delete user", "err", err)
 		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	c.JSON(200, gin.H{"Success;": " User erased"})
+	err = SoftDelete_Mail(s, data.Email)
+	if err != nil {
+		slog.Error("Error creating soft_delete email", "err", err)
+		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	c.JSON(200, gin.H{"Success;": " User erased requested"})
 }
 
 func Two_FA_reset(

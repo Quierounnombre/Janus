@@ -13,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
-	"golang.org/x/crypto/bcrypt"
 	validator "github.com/wagslane/go-password-validator"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func create_table_user(db *Db_data) {
@@ -67,12 +67,12 @@ func GetUser(db *Db_data, id string) (*User, error) {
 
 	user = new(User)
 	sql = `
-	SELECT name, email, id, picture FROM users WHERE id=$1
+	SELECT name, email, id, picture, joined FROM users WHERE id=$1
 	`
 	ctx, cancel = db.ctx()
 	defer cancel()
 	row = db.pool.QueryRow(ctx, sql, id)
-	err = row.Scan(&user.Name, &user.Email, &user.UserID, &user.Picture)
+	err = row.Scan(&user.Name, &user.Email, &user.UserID, &user.Picture, &user.Joined)
 	return user, err
 }
 
@@ -86,12 +86,12 @@ func GetUserByMail(db *Db_data, email string) (*User, error) {
 
 	user = new(User)
 	sql = `
-	SELECT name, email, id, picture FROM users WHERE email=$1
+	SELECT name, email, id, picture, joined FROM users WHERE email=$1
 	`
 	ctx, cancel = db.ctx()
 	defer cancel()
 	row = db.pool.QueryRow(ctx, sql, email)
-	err = row.Scan(&user.Name, &user.Email, &user.UserID, &user.Picture)
+	err = row.Scan(&user.Name, &user.Email, &user.UserID, &user.Picture, &user.Joined)
 	return user, err
 }
 
@@ -160,6 +160,24 @@ func CheckUserPassword(db *Db_data, req LoginRequest) (bool, error) {
 	return true, err
 }
 
+//INTERNAL USE ONLY, this retrieve the user password hash
+//ASUME THAT THE USER EXIST
+func GetPassword(db *Db_data, id string) (string, error) {
+	var pass_hash	string
+
+	sql := `
+	SELECT password_hash FROM users WHERE id=$1
+	`
+	ctx, cancel := db.ctx()
+	defer cancel()
+	row := db.pool.QueryRow(ctx, sql, id)
+	err := row.Scan(&pass_hash)
+	if err != nil {
+		return "", err
+	}
+	return pass_hash, nil
+}
+
 func Login_or_ADD_User(db *Db_data, storage_data *User) (*User, error) {
 	var tmp_email	string
 	var sql			string
@@ -188,7 +206,7 @@ func Login_or_ADD_User(db *Db_data, storage_data *User) (*User, error) {
 
 func EraseUser(
 	db		*Db_data,
-	data	*Two_FA_data,
+	id		string,
 ) error {
 	var sql		string
 	var err		error
@@ -196,11 +214,11 @@ func EraseUser(
 	var cancel	context.CancelFunc
 
 	sql = `
-	DELETE FROM users WHERE email=$1
+	DELETE FROM users WHERE id=$1
 	`
 	ctx, cancel = db.ctx()
 	defer cancel()
-	_, err = db.pool.Exec(ctx, sql, data.Email)
+	_, err = db.pool.Exec(ctx, sql, id)
 	return err
 }
 
@@ -273,7 +291,7 @@ func ResetPass(s *Settings, db *Db_data) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": "Error creating 2FA"})
 			return
 		}
-		err = TwoFA_Mail(s, db, body.Email, id_2fa)
+		err = TwoFA_Mail(s, body.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"error": "Sending 2FA confirmation"})
@@ -302,7 +320,7 @@ db				*Db_data,
 			c.JSON(500, gin.H{"error": "Requesting Erasing User"})
 			return
 		}
-		err = TwoFA_Mail(s, db, user.Email, id_2fa)
+		err = TwoFA_Mail(s, user.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"error": "Requesting Erasing User"})

@@ -19,6 +19,7 @@ const (
 	D_Reset_pass_time	= 5 * time.Minute
 	D_Reset_check_time	= 5 * time.Minute
 	D_2FA_time			= 5 * time.Minute
+	D_Soft_delete_time	= 5 * time.Minute
 
 	D_2FA_DB			= "pending_2fa"
 	D_USERS_DB			= "users"

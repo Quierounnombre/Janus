@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"log/slog"
 	"time"
-
 	"gopkg.in/gomail.v2"
 )
 
@@ -124,7 +123,29 @@ func resetPasswordHTML(link string) (string, error) {
 	return buf.String(), nil
 }
 
-func TwoFA_Mail(s *Settings, db *Db_data, target string, id_2fa string) error {
+func eraseHTML(date string) (string, error) {
+	var buf		bytes.Buffer
+	var err		error
+
+	err = tmpls.ExecuteTemplate(&buf, "erase_request.html", struct{ Date string }{ date })
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func eraseconfirmationHTLM() (string, error) {
+	var buf		bytes.Buffer
+	var err		error
+
+	err = tmpls.ExecuteTemplate(&buf, "erase_confirmation.html", nil)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func TwoFA_Mail(s *Settings, target string, id_2fa string) error {
 	var err		error
 
 	m := gomail.NewMessage()
@@ -153,3 +174,38 @@ func TwoFAHTML(link string) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+func SoftDelete_Mail(s *Settings, target string) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.Mail.From)
+	m.SetHeader("To", target)
+	m.SetHeader("Subject", "Su usuario va a ser eliminado")
+	str, err := eraseHTML(s.Delete.Delete_time.String())
+	if err != nil {
+		return err
+	}
+	m.SetBody("text/html", str)
+	err = s.Mail.Enqueue(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SoftDelete_Confirmation_Mail(s *Settings, target string) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.Mail.From)
+	m.SetHeader("To", target)
+	m.SetHeader("Subject", "Su usuario ha sido eliminado")
+	str, err := eraseconfirmationHTLM()
+	if err != nil {
+		return err
+	}
+	m.SetBody("text/html", str)
+	err = s.Mail.Enqueue(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+

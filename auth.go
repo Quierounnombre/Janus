@@ -305,7 +305,7 @@ func Pass_Singup(
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 			return
 		}
-		err = TwoFA_Mail(s, db, req.Email, id_2fa)
+		err = TwoFA_Mail(s, req.Email, id_2fa)
 		if err != nil {
 			slog.Error("2FA sending email", "err", err)
 			c.JSON(500, gin.H{"Error:": " Error in 2FA"})

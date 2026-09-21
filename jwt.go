@@ -129,7 +129,6 @@ func logout_response(rds *Redis_data) func(c *gin.Context) {
 		//token := g_jwt.GetToken(c)
 		//ERASE WHEN FIXED
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-		slog.Info("TOKEN AQUI", "token", token)
 		expires_at := time.Unix(int64(raw_exp), 0)
 		remaining := time.Until(expires_at)
 		if remaining > 0 {

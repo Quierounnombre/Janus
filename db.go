@@ -41,9 +41,10 @@ func (db *Db_data)ctx() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func Set_db_tables(db *Db_data) {
+func Set_db_tables(db *Db_data, s *Settings) {
 	create_table_user(db)
 	create_2FA_table(db)
+	create_table_soft_delete(db, s)
 }
 
 func Set_db(s *Settings, db *Db_data) {

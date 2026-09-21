@@ -16,7 +16,7 @@ func main() {
 	Set_db(&set, &db)
 	Set_Redis(&set, &rds)
 	defer db.pool.Close()
-	Set_db_tables(&db)
+	Set_db_tables(&db, &set)
 	eng = Set_gin(&set, &db, &rds)
 	eng.Run(set.Port)
 }

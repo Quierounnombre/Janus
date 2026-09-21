@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -84,8 +85,8 @@ func cleanup_soft_delete_table(db *Db_data, s *Settings) {
 }
 
 //Note this use a GetUser, could send the struct user instead
-func move_to_soft_delete(db *Db_data, id string) error {
-	user, err := GetUser(db, id)
+func move_to_soft_delete(db *Db_data, email string) error {
+	user, err := GetUserByMail(db, email)
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func move_to_soft_delete(db *Db_data, id string) error {
 	if err != nil {
 		return err
 	}
-	err = EraseUser(db, id)
+	err = EraseUser(db, user.UserID.String())
 	if err != nil {
 		return err
 	}

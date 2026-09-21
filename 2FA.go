@@ -262,7 +262,7 @@ func Two_FA_erase(
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	err = move_to_soft_delete(db, data.Id)
+	err = move_to_soft_delete(db, data.Email)
 	if err != nil {
 		slog.Error("Error moving to soft_delete user", "err", err)
 		c.JSON(500,  gin.H{"Error:": " Error in 2FA"})

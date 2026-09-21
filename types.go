@@ -203,6 +203,7 @@ type Rate_limits struct {
 //------------------------------------------------------------------------------------------------------2FA
 
 type Two_FA_data struct {
+	//IMPORTANT ID IS OF THE 2FA REQUEST, NOT THE USER, USER ID is provided by the DB at creation on user table
 	Id				string
 	Email			string
 	Created_at		time.Time

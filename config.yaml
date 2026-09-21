@@ -101,6 +101,10 @@ mail:
   worker_per_queue: 200
   sleep_time: 2m
 
+delete:
+  #Time d is not well parsed, converted into hours.
+  delete_time: 168h
+
 password:
   #Password based on min entropy needed, that means that you are setting how hard would be to break the password,
   # Between 50-70 is average, 80 is recomended.

@@ -101,6 +101,42 @@ func move_to_soft_delete(db *Db_data, email string) error {
 	return nil
 }
 
+func move_from_soft_delete(db *Db_data, data *Soft_delete_data) error {
+	user := User{
+		UserID: data.UserID,
+		Name: data.Name,
+		Email: data.Email,
+		Picture: data.Picture,
+		Joined: data.Joined,
+	}
+	err := AddUser(db, &user)
+	if err != nil {
+		return err
+	}
+	err = StorePassSimple(db, data.Password_hash, data.Email, D_USERS_DB)
+	if err != nil {
+		return err
+	}
+	err = erase_soft_delete(db, data.UserID.String())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func erase_soft_delete(db *Db_data, id string) error {
+	delete_sql := `
+	DELETE FROM soft_delete WHERE user_id = ANY($1)
+	`
+	ctx, cancel := db.ctx()
+	defer cancel()
+	_, err := db.pool.Exec(ctx, delete_sql, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func AddUser_to_softdelete(db *Db_data, user *User) error {
 	var err		error
 	var sql		string
@@ -118,4 +154,16 @@ func AddUser_to_softdelete(db *Db_data, user *User) error {
 	defer cancel()
 	_, err = db.pool.Exec(ctx, sql, user.UserID, user.Name, pass_hash, user.Email, user.Picture, user.Joined)
 	return err
+}
+
+func GetSoftDeleteByMail(db *Db_data, email string) (*Soft_delete_data, error) {
+	data := new(Soft_delete_data)
+	sql := `
+	SELECT name, email, id, picture, joined, password_hash, created_at FROM soft_delete WHERE email=$1
+	`
+	ctx, cancel := db.ctx()
+	defer cancel()
+	row := db.pool.QueryRow(ctx, sql, email)
+	err := row.Scan(&data.Name, &data.Email, &data.UserID, &data.Picture, &data.Joined, &data.Password_hash, &data.Created_at)
+	return data, err
 }

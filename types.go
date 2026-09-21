@@ -213,3 +213,14 @@ type Two_FA_data struct {
 	Purpose			string
 }
 
+//------------------------------------------------------------------------------------------------------SOFT DELETE
+
+type Soft_delete_data struct {
+	UserID			uuid.UUID
+	Email			string
+	Created_at		time.Time
+	Joined			time.Time
+	Name			string
+	Password_hash	string
+	Picture			string
+}

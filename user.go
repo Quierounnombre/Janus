@@ -329,3 +329,53 @@ db				*Db_data,
 		c.JSON(200, gin.H{"result": "Check your email"})
 	}
 }
+
+func RequestRestoreUser(
+s				*Settings,
+db				*Db_data,
+) gin.HandlerFunc {
+	return func (c *gin.Context) {
+		var body	struct {
+			Email		string	`json:"email"`
+		}
+		err := c.ShouldBindJSON(&body)
+		if err != nil {
+			slog.Warn("Missing body on a restore user request", "err", err)
+			c.JSON(400, gin.H{"Error:": " Invalid content"})
+			return 
+		}
+		if body.Email == "" {
+			slog.Warn("Missing email on a resetpass request")
+			c.JSON(400, gin.H{"Error:": " Missing email"})
+			return
+		}
+		data, err := GetSoftDeleteByMail(db, body.Email)
+		if err != nil {
+			//NOT LEAKING WHICH ACOUNTS ARE WAITING DELETION
+			slog.Warn("Someone tryed to restore a account that dosent exist", "err", err)
+			c.JSON(200, gin.H{"result": "Check your email"})
+			return
+		}
+		user := User{
+			UserID: data.UserID,
+			Name: data.Name,
+			Email: data.Email,
+			Picture: data.Picture,
+			Joined: data.Joined,
+		}
+		id_2fa, err := create_a_2FA(db, &user, "", P_Recover)
+		if err != nil {
+			slog.Error("2fa creation failed", "email", body.Email, "err", err)
+			c.JSON(500, gin.H{"error": "Error creating 2FA"})
+			return
+		}
+		err = TwoFA_Mail(s, body.Email, id_2fa)
+		if err != nil {
+			slog.Error("2FA sending email", "err", err)
+			c.JSON(500, gin.H{"error": "Sending 2FA confirmation"})
+			return
+		}
+		c.JSON(200, gin.H{"result": "Check your email"})
+	}
+}
+

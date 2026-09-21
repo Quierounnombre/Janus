@@ -11,6 +11,7 @@ const (
 	P_Delete			= "delete"
 	P_Signup			= "signup"
 	P_Reset				= "reset"
+	P_Recover			= "recover"
 
 	D_config_path		= "config.yaml"
 	D_JWT_identity_key	= "user_id"

@@ -35,6 +35,7 @@ func Set_endpoints(
 	eng.POST("/PassReset", ResetPass(s, db))
 	eng.POST("/Refresh", handle.RefreshHandler)
 	eng.GET("/Public-key", Expose_pub_key(s))
+	eng.POST("/Recover", RequestRestoreUser(s, db))
 	eng.NoRoute(handle.MiddlewareFunc(), handleNoRoute())
 	auth := eng.Group("/User/", handle.MiddlewareFunc())
 	{

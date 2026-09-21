@@ -176,10 +176,32 @@ func Handle2FAVerified(
 			Two_FA_login(db, &data, c, authMiddleware)
 		case P_Reset:
 			Two_FA_reset(db, &data, c, authMiddleware)
+		case P_Recover:
+			Two_FA_recover(db, &data, c)
 		default:
 			c.JSON(500, gin.H{"Error:": "unknown 2fa purpose: " + data.Purpose})
 		}
 	}
+}
+
+func Two_FA_recover(
+	db					*Db_data,
+	data				*Two_FA_data,
+	c					*gin.Context,
+) {
+	soft_delete_data, err := GetSoftDeleteByMail(db, data.Email)
+	if err != nil {
+		slog.Error("User not found in deletion queue", "err", err)
+		c.JSON(500, gin.H{"Error:": "Error in 2FA"})
+		return
+	}
+	err = move_from_soft_delete(db, soft_delete_data)
+	if err != nil {
+		slog.Error("Error moving user from soft_delete to users", "err", err)
+		c.JSON(500, gin.H{"Error:": "Error in 2FA"})
+		return
+	}
+	c.JSON(200, gin.H{"Success:": "Account recovered"})
 }
 
 func Two_FA_signup(
@@ -194,6 +216,12 @@ func Two_FA_signup(
 	_, err = GetUserByMail(db, data.Email)
 	if err != pgx.ErrNoRows {
 		slog.Error("User already exists", "err", err)
+		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+		return
+	}
+	_, err = GetSoftDeleteByMail(db, data.Email)
+	if err != pgx.ErrNoRows {
+		slog.Error("User exists and is requested for deletion", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}

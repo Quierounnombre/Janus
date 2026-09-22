@@ -169,7 +169,7 @@ func Handle2FAVerified(
 		}
 		switch data.Purpose {
 		case P_Signup:
-			Two_FA_signup(db, &data, c, authMiddleware)
+			Two_FA_signup(db, &data, c, authMiddleware, s)
 		case P_Delete:
 			Two_FA_erase(db, &data, c, authMiddleware, s)
 		case P_Login:
@@ -209,6 +209,7 @@ func Two_FA_signup(
 	data				*Two_FA_data,
 	c					*gin.Context,
 	authMiddleware		*g_jwt.GinJWTMiddleware,
+	s					*Settings,
 ) {
 	var err			error
 
@@ -219,9 +220,18 @@ func Two_FA_signup(
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}
-	_, err = GetSoftDeleteByMail(db, data.Email)
+	soft_data, err := GetSoftDeleteByMail(db, data.Email)
 	if err != pgx.ErrNoRows {
-		slog.Error("User exists and is requested for deletion", "err", err)
+		if err != nil {
+			slog.Error("User exists and is requested for deletion", "err", err)
+			err = SoftDelete_Detected(s, data.Email, soft_data)
+			if err != nil {
+				slog.Error("Error sending mail to existing user", "err", err)
+				c.JSON(500, gin.H{"Error:": " Error in 2FA"})
+				return
+			}
+		}
+		slog.Error("DB error", "err", err)
 		c.JSON(500, gin.H{"Error:": " Error in 2FA"})
 		return
 	}

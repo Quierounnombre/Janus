@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log/slog"
 	"time"
+
 	"gopkg.in/gomail.v2"
 )
 
@@ -134,11 +135,30 @@ func eraseHTML(date string) (string, error) {
 	return buf.String(), nil
 }
 
-func eraseconfirmationHTLM() (string, error) {
+func eraseconfirmationHTML() (string, error) {
 	var buf		bytes.Buffer
 	var err		error
 
 	err = tmpls.ExecuteTemplate(&buf, "erase_confirmation.html", nil)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func erasedetectedHTML(soft_data *Soft_delete_data, s *Settings) (string, error) {
+	var buf		bytes.Buffer
+
+	deadline := soft_data.Created_at.Add(s.Delete.Delete_time).Format("2006-01-02")
+	data := struct {
+		Name				string
+		RecoveryDeadline	string
+	} {
+		Name: soft_data.Name,
+		RecoveryDeadline: deadline,
+	}
+
+	err := tmpls.ExecuteTemplate(&buf, "erase_detected.html", data)
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +217,7 @@ func SoftDelete_Confirmation_Mail(s *Settings, target string) error {
 	m.SetHeader("From", s.Mail.From)
 	m.SetHeader("To", target)
 	m.SetHeader("Subject", "Su usuario ha sido eliminado")
-	str, err := eraseconfirmationHTLM()
+	str, err := eraseconfirmationHTML()
 	if err != nil {
 		return err
 	}
@@ -209,3 +229,19 @@ func SoftDelete_Confirmation_Mail(s *Settings, target string) error {
 	return nil
 }
 
+func SoftDelete_Detected(s *Settings, target string, data *Soft_delete_data) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.Mail.From)
+	m.SetHeader("To", target)
+	m.SetHeader("Subject", "Tiene una cuenta pendiente de eliminación")
+	str, err := erasedetectedHTML(data, s)
+	if err != nil {
+		return err
+	}
+	m.SetBody("text/html", str)
+	err = s.Mail.Enqueue(m)
+	if err != nil {
+		return err
+	}
+	return nil
+}

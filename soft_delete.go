@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func create_table_soft_delete(db *Db_data, s *Settings) {
@@ -50,6 +51,9 @@ func cleanup_soft_delete_table(db *Db_data, s *Settings) {
 		ctx, cancel := db.ctx()
 		rows, err := db.pool.Query(ctx, select_sql, s.Delete.Delete_time.String())
 		if err != nil {
+			if err == pgx.ErrNoRows {
+				continue
+			}
 			slog.Error("cleanup failed", "err", err)
 			cancel()
 			continue
